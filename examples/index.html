@@ -1,118 +1,795 @@
 <!doctype html>
-<html lang="en" class="fixed dark">
+<html lang="tr">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <link rel="stylesheet" href="cjs/seatmap.canvas.css" crossorigin="anonymous">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script defer type="text/javascript" src="cjs/seatmap.canvas.js"></script>
-    <link href="https://use.fontawesome.com/releases/v6.4.2/css/all.css" rel="stylesheet"/>
-    <script async defer src="https://buttons.github.io/buttons.js"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-        }
-    </script>
-    <style>
-        #seats_container {
-            position: relative;
-            border-radius: 0 !important;
-            background-size: 0.5rem 0.5rem;
-            background-position: 0.25rem 0.25rem;
-            background-image: linear-gradient(to right, rgba(50, 100, 150, 0.1) 1px, transparent 1px), linear-gradient(to bottom, rgba(50, 100, 150, 0.1) 1px, transparent 1px);
-            margin: 0;
-        }
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Seatmap – Zone Based Tables</title>
 
-        #seats_container::before, #seats_container::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            bottom: 0;
-            right: 0;
-            background-size: 2.5rem 2.5rem;
-            background-position: 0.25rem 0.25rem;
-            background-image: linear-gradient(to right, rgba(50, 100, 150, 0.1) 2px, transparent 2px), linear-gradient(to bottom, rgba(50, 100, 150, 0.1) 2px, transparent 2px);
-            z-index: -1;
-        }
+  <!-- KÜTÜPHANE CSS/JS (DOKUNMADAN) -->
+  <link rel="stylesheet" href="cjs/seatmap.canvas.css">
+  <script src="cjs/seatmap.canvas.js"></script>
 
-        #seats_container::after {
-            background-size: 5rem 5rem;
-            background-image: linear-gradient(to right, rgba(50, 100, 150, 0.1) 3px, transparent 3px), linear-gradient(to bottom, rgba(50, 100, 150, 0.1) 3px, transparent 3px);
-        }
-    </style>
-    <title>Seatmap Demo</title>
+  <!-- Tailwind opsiyonel -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    html, body { width:100%; height:100%; margin:0; }
+
+    /* Arka plan */
+    #seats_container{
+      position:relative;
+      width:100vw;
+      height:100vh;
+      background: #ffeb3b;
+      overflow:hidden;
+    }
+
+    /* Seatmap canvas kesin görünür */
+    #seats_container canvas{ display:block !important; width:100% !important; height:100% !important; }
+
+    #stageOverlay{
+      position:fixed;
+      top:20px;
+      left:50%;
+      transform:translateX(-50%);
+      width:480px;
+      height:110px;
+      border:8px solid #c79a1b;
+      border-radius:26px;
+      overflow:hidden;
+      background:#fff;
+      color:#c79a1b;
+      font-weight:800;
+      font-size:36px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      z-index:9999;
+      box-shadow:
+        0 0 40px rgba(199,154,27,.35),
+        0 10px 30px rgba(0,0,0,.35);
+      pointer-events:none;
+      user-select:none;
+    }
+
+    /* Premium legend overlay */
+    #legendOverlay{
+      position:fixed;
+      left:50%;
+      bottom:18px;
+      transform:translateX(-50%);
+      z-index:9999;
+      width:min(920px, calc(100vw - 24px));
+      pointer-events:auto;
+    }
+
+    .glass{
+      background: rgba(10,10,12,0.55);
+      border: 1px solid rgba(255,255,255,0.10);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      box-shadow: 0 10px 35px rgba(0,0,0,0.45);
+    }
+
+    .swatch{
+      width:14px; height:14px; border-radius:26px;
+      box-shadow: 0 0 0 2px rgba(255,255,255,0.10) inset, 0 6px 14px rgba(0,0,0,0.35);
+      display:inline-block;
+    }
+
+    /* Legend toggle */
+    #legendToggleBtn{
+      position:fixed;
+      right:18px;
+      bottom:18px;
+      z-index:10000;
+      padding:10px 14px;
+      border-radius:14px;
+      background: rgba(10,10,12,0.55);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: rgba(255,255,255,0.85);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      box-shadow: 0 10px 35px rgba(0,0,0,0.45);
+      cursor:pointer;
+    }
+    #legendToggleBtn:hover{
+      color:#e0e0e0;
+      border-color: rgba(255,255,255,0.22);
+    }
+
+    /* Click Price Badge */
+    #priceBadge{
+      position:fixed;
+      z-index:10001;
+      display:none;
+      pointer-events:none;
+      padding:10px 12px;
+      border-radius:14px;
+      background: rgba(10,10,12,0.72);
+      border: 1px solid rgba(255,255,255,0.14);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      box-shadow: 0 12px 35px rgba(0,0,0,0.45);
+      color: rgba(255,255,255,0.92);
+      font: 600 13px/1.25 system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      transform: translate(12px, 12px);
+      max-width: 360px;
+      white-space: nowrap;
+    }
+    #priceBadge .muted{ color: rgba(255,255,255,0.65); font-weight: 500; }
+    #priceBadge .price{ font-size:14px; font-weight:800; letter-spacing:0.2px; }
+
+    /* CART PANEL */
+    #cartPanel{
+      position:fixed;
+      top:18px;
+      right:18px;
+      z-index:10002;
+      width: min(360px, calc(100vw - 36px));
+      max-height: calc(100vh - 36px);
+      overflow:hidden;
+      pointer-events:auto;
+      display:flex;
+      flex-direction:column;
+      border-radius:18px;
+    }
+    #cartHeader{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding:12px 14px;
+      border-bottom:1px solid rgba(255,255,255,0.10);
+    }
+    #cartBody{
+      padding:12px 14px;
+      overflow:auto;
+    }
+    .cartLine{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:12px;
+      padding:10px 0;
+      border-bottom:1px dashed rgba(255,255,255,0.10);
+    }
+    .cartLeft{ min-width:0; }
+    .cartTitle{
+      color: rgba(255,255,255,0.92);
+      font-weight:700;
+      font-size:13px;
+      line-height:1.2;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+      max-width:220px;
+    }
+    .cartMeta{
+      margin-top:3px;
+      color: rgba(255,255,255,0.60);
+      font-size:12px;
+    }
+    .cartPrice{
+      color: rgba(255,255,255,0.92);
+      font-weight:800;
+      font-size:13px;
+      white-space:nowrap;
+    }
+    .cartRemove{
+      margin-top:6px;
+      font-size:12px;
+      color: rgba(255,255,255,0.65);
+      cursor:pointer;
+      border:1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.06);
+      padding:6px 8px;
+      border-radius:12px;
+    }
+    .cartRemove:hover{
+      color:#fff;
+      border-color: rgba(255,255,255,0.20);
+    }
+    #cartFooter{
+      padding:12px 14px;
+      border-top:1px solid rgba(255,255,255,0.10);
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+    #cartTotalRow{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      color: rgba(255,255,255,0.92);
+      font-weight:800;
+    }
+    #cartActions{
+      display:flex;
+      gap:10px;
+    }
+    .btn{
+      flex:1;
+      padding:10px 12px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.06);
+      color: rgba(255,255,255,0.88);
+      cursor:pointer;
+      font-weight:700;
+    }
+    .btn:hover{ color:#fff; border-color: rgba(255,255,255,0.20); }
+    .btnPrimary{
+      background: rgba(201,154,27,0.22);
+      border-color: rgba(201,154,27,0.35);
+    }
+    .btnPrimary:hover{
+      background: rgba(201,154,27,0.28);
+      border-color: rgba(201,154,27,0.45);
+    }
+    #cartEmpty{
+      color: rgba(255,255,255,0.60);
+      font-size:13px;
+      padding:6px 0 2px;
+    }
+
+    /* ============================= */
+    /* CANVAS CLICK FIX (ZORUNLU)    */
+    /* ============================= */
+
+    /* Canvas tıklama alsın */
+    #seats_container,
+    #seats_container canvas {
+      pointer-events: auto;
+    }
+
+    /* Üst overlay'ler canvas'ı BLOKLAMASIN */
+    #stageOverlay,
+    #legendOverlay,
+    #cartPanel {
+      pointer-events: none;
+    }
+
+    /* Ama butonlar çalışmaya devam etsin */
+    #legendToggleBtn,
+    #cartPanel button {
+      pointer-events: auto;
+    }
+  </style>
 </head>
+
 <body>
+  <div id="seats_container"></div>
+  <div id="stageOverlay">STAGE</div>
 
-<div class="absolute dark:bg-gray-900 flex flex-col w-screen h-screen select-none">
-
-    <div class="bg-[#ab1f34] flex flex-row justify-center px-6 border-b border-[#d05063]">
-        <div class="flex-1 flex gap-1.5 justify-center justify-center">
-            <img class="h-11 py-1" src="logo_small.jpg">
-        </div>
-        <div class="w-4 flex items-center cursor-pointer" id="dark-mode-btn">
-            <svg class="h-4 w-4 fill-white" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512">
-                <path d="M223.5 32C100 32 0 132.3 0 256S100 480 223.5 480c60.6 0 115.5-24.2 155.8-63.4c5-4.9 6.3-12.5 3.1-18.7s-10.1-9.7-17-8.5c-9.8 1.7-19.8 2.6-30.1 2.6c-96.9 0-175.5-78.8-175.5-176c0-65.8 36-123.1 89.3-153.3c6.1-3.5 9.2-10.5 7.7-17.3s-7.3-11.9-14.3-12.5c-6.3-.5-12.6-.8-19-.8z"/>
-            </svg>
-        </div>
+  <!-- CART -->
+  <div id="cartPanel" class="glass">
+    <div id="cartHeader">
+      <div style="color:rgba(255,255,255,0.92); font-weight:800;">Selected seats</div>
+      <div id="cartCount" style="color:rgba(255,255,255,0.65); font-size:12px;">0</div>
     </div>
-    <div class="flex flex-row h-full">
-        <div class="w-48 bg-gray-100 dark:bg-gray-800 hidden md:block border-r border-r-gray-300 dark:border-r-gray-600">
-            <div class="flex flex-col gap-3 px-3 py-4 text-xs">
-                <div class="w-full flex flex-col gap-1.5 p-2 dark:bg-gray-700 rounded-md">
-                    <div class="text-center dark:text-white">Example Data</div>
-                    <div class="w-full flex flex-col">
-                        <button class="border text-left border-slate-500 bg-gray-100 dark:bg-gray-900 dark:text-white dark:hover:bg-gray-700 text-slate-800 py-1  px-3 rounded-md hover:bg-slate-200"
-                                id="randomize-btn"
-                                data-block-id="block-2">
-                            <i class="fa-solid fa-magnifying-glass-plus mr-2"></i>
-                            Randomize
-                        </button>
-                    </div>
-                    <div id="profiles" class="w-full flex flex-col gap-1.5">
-
-                    </div>
-                </div>
-
-                <div id="zoom-blocks-buttons" class="w-full flex flex-col gap-1.5 p-2 dark:bg-gray-600 rounded-md text-center"></div>
-
-
-            </div>
-        </div>
-        <div id="seats_container" class="w-full flex-1 h-full bg-white dark:bg-gray-700"></div>
-
-        <div class="hidden md:flex flex-col dark:bg-gray-800 w-52 flex-0 border-l dark:border-l-gray-600">
-            <div class="text-center w-full text-sm p-2 bg-gray-100 dark:bg-gray-950 dark:text-white border-b">Selected
-                Seats
-            </div>
-            <table class="table-auto text-sm">
-                <tbody id="selected-seats">
-
-                </tbody>
-            </table>
-        </div>
+    <div id="cartBody">
+      <div id="cartEmpty">No seats selected yet.</div>
+      <div id="cartList"></div>
     </div>
-    <div class="border-t dark:border-t-gray-700 w-full h-12 right-3 px-6 flex flex-row gap-6 items-center justify-between content-center">
-        <div class="h-5">
-            <a class="github-button" href="https://github.com/alisaitteke/seatmap-canvas/subscription"
-               data-icon="octicon-eye" aria-label="Watch alisaitteke/seatmap-canvas on GitHub">Watch</a>
-            <a class="github-button" href="https://github.com/alisaitteke" aria-label="Follow @alisaitteke on GitHub">Follow
-                @alisaitteke</a>
-            <a class="github-button" href="https://github.com/alisaitteke/seatmap-canvas/fork"
-               data-icon="octicon-repo-forked" aria-label="Fork alisaitteke/seatmap-canvas on GitHub">Fork</a>
-        </div>
-        <div>
-            <a href="https://d3js.org/" target="_blank">
-                <img class="h-8 " src="https://raw.githubusercontent.com/d3/d3-logo/master/d3.svg">
-            </a>
-
-        </div>
+    <div id="cartFooter">
+      <div id="cartTotalRow">
+        <div id="cartVatLabel" style="color:rgba(255,255,255,0.65); font-size:12px; font-weight:700;">Total (VAT EXCL)</div>
+        <div id="cartTotal">AED 0</div>
+      </div>
+      <div id="cartActions">
+        <button id="clearCartBtn" class="btn" type="button">Clear</button>
+        <button id="checkoutBtn" class="btn btnPrimary" type="button">Pay now</button>
+      </div>
+      <div style="color:rgba(255,255,255,0.55); font-size:11px;">
+        Note: Payment page will be connected to Stripe later (server-side).
+      </div>
     </div>
-</div>
-<script src="https://code.jquery.com/jquery-3.7.1.min.js"
-        integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+  </div>
 
-<script type="text/javascript" src="/example.js"></script>
+  <!-- Premium Legend Panel -->
+  <div id="legendOverlay">
+    <div id="legendPanel" class="glass rounded-2xl px-4 py-3">
+      <div class="flex items-center justify-between gap-3">
+        <div class="text-white/90 font-semibold tracking-wide">Legend</div>
+        <div class="text-white/60 text-xs">Automatically hides on zoom/pan</div>
+      </div>
+
+      <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div class="rounded-xl border border-white/10 p-3">
+          <div class="text-white/80 text-sm mb-2">Zones</div>
+          <div class="flex flex-wrap gap-x-5 gap-y-2 text-sm text-white/85">
+            <span class="inline-flex items-center gap-2"><i class="swatch" style="background:#e53935;"></i> RED</span>
+            <span class="inline-flex items-center gap-2"><i class="swatch" style="background:#c9a227;"></i> GOLD</span>
+            <span class="inline-flex items-center gap-2"><i class="swatch" style="background:#1e88e5;"></i> BLUE</span>
+            <span class="inline-flex items-center gap-2"><i class="swatch" style="background:#7a7a7a;"></i> SILVER</span>
+          </div>
+        </div>
+
+        <div class="rounded-xl border border-white/10 p-3">
+          <div class="text-white/80 text-sm mb-2">Seats</div>
+          <div class="flex flex-wrap gap-x-5 gap-y-2 text-sm text-white/85">
+            <span class="inline-flex items-center gap-2"><i class="swatch" style="background:#f2f3f5;"></i> Available</span>
+            <span class="inline-flex items-center gap-2"><i class="swatch" style="background:#9be21d;"></i> Selected</span>
+            <span class="inline-flex items-center gap-2"><i class="swatch" style="background:#3a3a3a;"></i> Reserved</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-3 flex items-center justify-between rounded-xl border border-white/10 p-3">
+        <div class="text-white/80 text-sm">VAT display</div>
+        <button id="vatToggleBtn" type="button"
+          class="px-3 py-2 rounded-xl border border-white/10 text-white/85 hover:text-white">
+          Prices: VAT EXCL
+        </button>
+      </div>
+
+      <div id="priceLine" class="mt-3 rounded-xl border border-white/10 p-3 text-sm text-white/85">
+        Prices: —
+      </div>
+
+      <div class="mt-3 text-white/55 text-xs">
+        Tip: The legend automatically hides when you zoom or pan. You can reopen it using the button in the bottom-right corner.
+      </div>
+    </div>
+  </div>
+
+  <button id="legendToggleBtn" type="button">Legend: Gizle</button>
+  <div id="priceBadge" aria-hidden="true"></div>
+
+  <script>
+    (function(){
+      document.addEventListener("DOMContentLoaded", function(){
+
+        if (!window.SeatMapCanvas){
+          console.error("SeatMapCanvas yok. cjs/seatmap.canvas.js yüklenmiyor olabilir.");
+          return;
+        }
+
+        const Z_RED   = "#e53935";
+        const Z_GOLD  = "#c9a227";
+        const Z_BLUE  = "#1e88e5";
+        const Z_SILV  = "#7a7a7a";
+
+        const AVAILABLE = "#f2f3f5";
+        const RESERVED  = "#3a3a3a";
+        const SELECTED  = "#9be21d";
+
+        // ---------- PRICING (AED) ----------
+        const PRICE_AED = { R: 1200, G: 1000, B: 800, S: 500 };
+        const VAT_RATE = 0.05;
+        let vatMode = "excl";
+
+        function formatAED(v){
+          return "AED " + Number(v).toLocaleString("en-US", {maximumFractionDigits:0});
+        }
+        function priceOf(zoneLetter){
+          const base = PRICE_AED[zoneLetter];
+          if (!base) return 0;
+          return (vatMode === "incl") ? Math.round(base * (1 + VAT_RATE)) : base;
+        }
+
+        // ---------- CART STATE ----------
+        const cart = new Map(); // seatId -> { id, title, zone }
+
+        const cartCountEl = document.getElementById("cartCount");
+        const cartEmptyEl = document.getElementById("cartEmpty");
+        const cartListEl  = document.getElementById("cartList");
+        const cartTotalEl = document.getElementById("cartTotal");
+        const cartVatLabelEl = document.getElementById("cartVatLabel");
+
+        const clearCartBtn = document.getElementById("clearCartBtn");
+        const checkoutBtn = document.getElementById("checkoutBtn");
+
+        function zoneFromSeatId(seatId){
+          if (!seatId || typeof seatId !== "string") return null;
+          const z = seatId.charAt(0).toUpperCase();
+          return ["R","G","B","S"].includes(z) ? z : null;
+        }
+
+        function renderCart(){
+          const count = cart.size;
+          cartCountEl.textContent = String(count);
+          cartEmptyEl.style.display = count ? "none" : "block";
+          cartListEl.innerHTML = "";
+
+          cartVatLabelEl.textContent = (vatMode === "incl") ? "Total (VAT INCL)" : "Total (VAT EXCL)";
+
+          let total = 0;
+          for (const item of cart.values()){
+            const p = priceOf(item.zone);
+            total += p;
+
+            const line = document.createElement("div");
+            line.className = "cartLine";
+            line.innerHTML = `
+              <div class="cartLeft">
+                <div class="cartTitle">${item.title}</div>
+                <div class="cartMeta">ID: ${item.id}</div>
+                <button class="cartRemove" type="button" data-remove="${item.id}">Remove</button>
+              </div>
+              <div class="cartPrice">${formatAED(p)}</div>
+            `;
+            cartListEl.appendChild(line);
+          }
+
+          cartTotalEl.textContent = formatAED(total);
+
+          cartListEl.querySelectorAll("[data-remove]").forEach(btn => {
+            btn.addEventListener("click", () => {
+              const sid = btn.getAttribute("data-remove");
+              if (!sid) return;
+              unselectSeatById(sid);
+            });
+          });
+
+          checkoutBtn.disabled = (count === 0);
+          checkoutBtn.style.opacity = (count === 0) ? "0.45" : "1";
+          checkoutBtn.style.cursor = (count === 0) ? "not-allowed" : "pointer";
+        }
+
+        // ---------- LEGEND ----------
+        const legendPanel   = document.getElementById("legendPanel");
+        const legendToggleBtn = document.getElementById("legendToggleBtn");
+        let legendVisible = true;
+
+        function showLegend(){
+          legendVisible = true;
+          legendPanel.style.display = "block";
+          legendToggleBtn.textContent = "Legend: Gizle";
+        }
+        function hideLegend(){
+          legendVisible = false;
+          legendPanel.style.display = "none";
+          legendToggleBtn.textContent = "Legend: Göster";
+        }
+        legendToggleBtn.addEventListener("click", function(e){
+          e.preventDefault();
+          if (legendVisible) hideLegend();
+          else showLegend();
+        });
+
+        // VAT toggle
+        const vatBtn = document.getElementById("vatToggleBtn");
+        const priceLine = document.getElementById("priceLine");
+
+        function renderPriceLine(){
+          const label = (vatMode === "incl") ? "VAT INCL" : "VAT EXCL";
+          priceLine.innerHTML =
+            `Prices (${label}): ` +
+            `RED <b>${formatAED(priceOf("R"))}</b> · ` +
+            `GOLD <b>${formatAED(priceOf("G"))}</b> · ` +
+            `BLUE <b>${formatAED(priceOf("B"))}</b> · ` +
+            `SILVER <b>${formatAED(priceOf("S"))}</b>`;
+        }
+
+        vatBtn.addEventListener("click", () => {
+          vatMode = (vatMode === "excl") ? "incl" : "excl";
+          vatBtn.textContent = (vatMode === "excl") ? "Prices: VAT EXCL" : "Prices: VAT INCL";
+          renderPriceLine();
+          renderCart();
+        });
+
+        // ---------- GEOMETRY ----------
+        function deg2rad(d){ return d * Math.PI / 180; }
+        function rotPoint(x, y, cx, cy, deg){
+          if (!deg) return {x, y};
+          const a = deg2rad(deg);
+          const dx = x - cx, dy = y - cy;
+          return {
+            x: cx + (dx * Math.cos(a) - dy * Math.sin(a)),
+            y: cy + (dx * Math.sin(a) + dy * Math.cos(a))
+          };
+        }
+
+        function zonePrefix(zoneKey){
+          if (zoneKey.startsWith("red")) return "R";
+          if (zoneKey.startsWith("gold")) return "G";
+          if (zoneKey.startsWith("blue")) return "B";
+          if (zoneKey.startsWith("silver")) return "S";
+          return "X";
+        }
+        function zoneLabel(zoneKey){
+          if (zoneKey.startsWith("red")) return "RED";
+          if (zoneKey.startsWith("gold")) return "GOLD";
+          if (zoneKey.startsWith("blue")) return "BLUE";
+          if (zoneKey.startsWith("silver")) return "SILVER";
+          return "ZONE";
+        }
+
+        function table(cx, cy, zoneKey, tableNo){
+          const seats = [];
+          const pref = zonePrefix(zoneKey);
+          const zLabel = zoneLabel(zoneKey);
+          const no2 = String(tableNo).padStart(2,"0");
+          const tableId = `${pref}${no2}`;
+
+          seats.push({
+            id:`${tableId}-BODY`,
+            x:cx, y:cy,
+            salable:false,
+            color:"#1a1b1f",
+            title: `${zLabel} • Table ${no2}`
+          });
+
+          const seatDefs = [
+            { seatNo: 1, x: cx-40, y: cy-40 },
+            { seatNo: 2, x: cx-40, y: cy+40 },
+            { seatNo: 3, x: cx+40, y: cy-40 },
+            { seatNo: 4, x: cx+40, y: cy+40 },
+          ];
+          seatDefs.forEach(s=>{
+            seats.push({
+              id: `${tableId}-S${s.seatNo}`,
+              x: s.x, y: s.y,
+              salable: true,
+              color: AVAILABLE,
+              title: `${zLabel} • Table ${no2} • Seat ${s.seatNo}`
+            });
+          });
+          return seats;
+        }
+
+        function buildZone(cfg){
+          const { id, zoneKey, color, x, y, rows, cols, gapX, gapY, padX, padY, angle, tableMap } = cfg;
+
+          const seats = [];
+          const gridW = (cols-1)*gapX;
+          const gridH = (rows-1)*gapY;
+          const pivotX = x + gridW/2;
+          const pivotY = y + gridH/2;
+
+          for (let r=0; r<rows; r++){
+            for (let c=0; c<cols; c++){
+              const manualNo = tableMap?.[r]?.[c];
+              if (!manualNo) continue;
+
+              const cx = x + c*gapX;
+              const cy = y + r*gapY;
+
+              const items = table(cx, cy, zoneKey, manualNo);
+              items.forEach(s=>{
+                const p = rotPoint(s.x, s.y, pivotX, pivotY, angle);
+                s.x = p.x; s.y = p.y;
+                seats.push(s);
+              });
+            }
+          }
+
+          const x1 = x - padX;
+          const y1 = y - padY;
+          const x2 = x + gridW + padX;
+          const y2 = y + gridH + padY;
+
+          const poly = [
+            {x:x1,y:y1,text:""},
+            {x:x2,y:y1,text:""},
+            {x:x2,y:y2,text:""},
+            {x:x1,y:y2,text:""},
+          ].map(pt=>{
+            const p = rotPoint(pt.x, pt.y, pivotX, pivotY, angle);
+            return {x:p.x, y:p.y, text:""};
+          });
+
+          let fillOpacity = 0.12;
+          if (zoneKey.startsWith("gold"))   fillOpacity = 0.14;
+          if (zoneKey.startsWith("blue"))   fillOpacity = 0.10;
+          if (zoneKey.startsWith("silver")) fillOpacity = 0.08;
+          if (angle !== 0) fillOpacity = Math.max(0.04, fillOpacity * 0.85);
+
+          return {
+            id,
+            color,
+            labels: poly,
+            style: {
+              fill: color,
+              fill_opacity: fillOpacity,
+              stroke: "transparent",
+              border_width: 0,
+              title_color: "transparent"
+            },
+            seats
+          };
+        }
+
+        // ---------- DATA ----------
+        const CENTER_X = 1500;
+        const ZONE_CONFIGS = [
+          { id:"block-red-center", zoneKey:"red-center", color:Z_RED, x:CENTER_X, y:-1000, rows:2, cols:5, gapX:320, gapY:420, padX:140, padY:120, angle:0,
+            tableMap:[ ["01","02","03","04","05"], ["09","10","11","12","13"] ] },
+          { id:"block-red-left-1", zoneKey:"red-left", color:Z_RED, x:1000, y:-1000, rows:1, cols:1, gapX:320, gapY:220, padX:120, padY:110, angle:-150,
+            tableMap:[ ["08"] ] },
+          { id:"block-red-right-1", zoneKey:"red-right", color:Z_RED, x:3250, y:-1000, rows:1, cols:2, gapX:400, gapY:220, padX:120, padY:110, angle:150,
+            tableMap:[ ["07","06"] ] },
+
+          { id:"block-gold-center", zoneKey:"gold-center", color:Z_GOLD, x:CENTER_X, y:-200, rows:2, cols:5, gapX:320, gapY:420, padX:140, padY:120, angle:0,
+            tableMap:[ ["01","02","03","04","05"], ["10","11","12","13","14"] ] },
+          { id:"block-gold-left-1", zoneKey:"gold-left", color:Z_GOLD, x:700, y:-350, rows:1, cols:2, gapX:320, gapY:220, padX:120, padY:110, angle:-150,
+            tableMap:[ ["09","08"] ] },
+          { id:"block-gold-left-2", zoneKey:"gold-left", color:Z_GOLD, x:400, y:100, rows:1, cols:3, gapX:320, gapY:220, padX:120, padY:110, angle:-150,
+            tableMap:[ ["19","18","17"] ] },
+          { id:"block-gold-right-1", zoneKey:"gold-right", color:Z_GOLD, x:3250, y:-350, rows:1, cols:2, gapX:320, gapY:220, padX:120, padY:110, angle:150,
+            tableMap:[ ["07","06"] ] },
+          { id:"block-gold-right-2", zoneKey:"gold-right", color:Z_GOLD, x:3250, y:100, rows:1, cols:2, gapX:320, gapY:220, padX:120, padY:110, angle:150,
+            tableMap:[ ["16","15"] ] },
+
+          { id:"block-blue-center", zoneKey:"blue-center", color:Z_BLUE, x:CENTER_X, y:600, rows:3, cols:5, gapX:320, gapY:420, padX:140, padY:120, angle:0,
+            tableMap:[ ["01","02","03","04","05"], ["11","12","13","14","15"], ["21","22","23","24","25"] ] },
+          { id:"block-blue-left-1", zoneKey:"blue-left", color:Z_BLUE, x:400, y:600, rows:1, cols:3, gapX:320, gapY:220, padX:120, padY:110, angle:-150,
+            tableMap:[ ["10","09","08"] ] },
+          { id:"block-blue-left-2", zoneKey:"blue-left", color:Z_BLUE, x:400, y:1100, rows:1, cols:3, gapX:320, gapY:220, padX:120, padY:110, angle:-150,
+            tableMap:[ ["20","19","18"] ] },
+          { id:"block-blue-right-1", zoneKey:"blue-right", color:Z_BLUE, x:3250, y:600, rows:1, cols:2, gapX:320, gapY:220, padX:120, padY:110, angle:150,
+            tableMap:[ ["07","06"] ] },
+          { id:"block-blue-right-2", zoneKey:"blue-right", color:Z_BLUE, x:3250, y:1100, rows:1, cols:2, gapX:320, gapY:220, padX:120, padY:110, angle:150,
+            tableMap:[ ["17","16"] ] },
+
+          { id:"block-silver-center-1", zoneKey:"silver-center", color:Z_SILV, x:CENTER_X, y:1850, rows:2, cols:5, gapX:320, gapY:420, padX:140, padY:120, angle:0,
+            tableMap:[ ["01","02","03","04","05"], ["12","13","14","15","16"] ] },
+          { id:"block-silver-center-2", zoneKey:"silver-center", color:Z_SILV, x:CENTER_X, y:2700, rows:1, cols:1, gapX:320, gapY:220, padX:140, padY:120, angle:0,
+            tableMap:[ ["23"] ] },
+          { id:"block-silver-left-1", zoneKey:"silver-left", color:Z_SILV, x:100, y:1650, rows:1, cols:4, gapX:320, gapY:220, padX:120, padY:110, angle:-150,
+            tableMap:[ ["11","10","09","08"] ] },
+          { id:"block-silver-left-2", zoneKey:"silver-left", color:Z_SILV, x:400, y:2300, rows:1, cols:3, gapX:320, gapY:220, padX:120, padY:110, angle:-150,
+            tableMap:[ ["22","21","20"] ] },
+          { id:"block-silver-left-3", zoneKey:"silver-left", color:Z_SILV, x:400, y:2700, rows:1, cols:1, gapX:320, gapY:220, padX:120, padY:110, angle:-150,
+            tableMap:[ ["28"] ] },
+          { id:"block-silver-right-1", zoneKey:"silver-right", color:Z_SILV, x:3450, y:1500, rows:1, cols:2, gapX:320, gapY:220, padX:120, padY:110, angle:150,
+            tableMap:[ ["07","06"] ] },
+          { id:"block-silver-right-2", zoneKey:"silver-right", color:Z_SILV, x:2800, y:2700, rows:1, cols:1, gapX:320, gapY:220, padX:140, padY:110, angle:0,
+            tableMap:[ ["24"] ] },
+          { id:"block-silver-right-3", zoneKey:"silver-right", color:Z_SILV, x:3550, y:2450, rows:1, cols:3, gapX:320, gapY:220, padX:120, padY:110, angle:150,
+            tableMap:[ ["27","26","25"] ] },
+          { id:"block-silver-right-4", zoneKey:"silver-right", color:Z_SILV, x:3350, y:2000, rows:1, cols:3, gapX:320, gapY:220, padX:120, padY:110, angle:150,
+            tableMap:[ ["19","18","17"] ] },
+        ];
+
+        const blocks = ZONE_CONFIGS.map(buildZone);
+
+        // Seatmap init
+        let seatmap;
+        try {
+          seatmap = new SeatMapCanvas("#seats_container", {
+            legend: false,
+            style: {
+              seat: {
+                color: AVAILABLE,
+                hover: "#ffffff",
+                selected: SELECTED,
+                check_icon_color: "#111",
+                not_salable: RESERVED
+              },
+              block: { title_color: "transparent" },
+              legend: { show: false }
+            }
+          });
+        } catch (err) {
+          console.error("SeatMapCanvas init hatası:", err);
+          return;
+        }
+
+        // DATA LOAD (senin çalışan yol)
+        try {
+          seatmap.data.replaceData(blocks);
+        } catch (e) {
+          console.error("replaceData hatası:", e);
+          return;
+        }
+
+        // Zoom (3 deneme)
+        function zoomTry(){
+          try { seatmap.zoomManager.zoomToVenue(); } catch(_){}
+        }
+        setTimeout(zoomTry, 150);
+        setTimeout(zoomTry, 650);
+        setTimeout(zoomTry, 1400);
+
+        renderPriceLine();
+        renderCart();
+
+        // Zoom/pan ile legend kapansın
+        const containerEl = document.querySelector("#seats_container");
+        ["wheel","touchstart","touchmove","mousedown"].forEach(ev=>{
+          containerEl.addEventListener(ev, function(){ hideLegend(); }, {passive:true});
+        });
+
+        // Seatmap seçili listeden id ile bulup unselect (basit)
+        function findSelectedSeatById(seatId){
+          try{
+            const sel = seatmap.getSelectedSeats ? seatmap.getSelectedSeats() : [];
+            return (sel || []).find(s => String(s.id) === String(seatId)) || null;
+          }catch(_){
+            return null;
+          }
+        }
+
+        function unselectSeatById(seatId){
+          try{
+            const s = findSelectedSeatById(seatId);
+            if (s) {
+              try { seatmap.seatUnselect(s); } catch(_){ }
+              try { s.unSelect && s.unSelect(); } catch(_){ }
+            }
+          }catch(_){ }
+          cart.delete(seatId);
+          renderCart();
+        }
+
+        clearCartBtn.addEventListener("click", () => {
+          try{
+            const sel = seatmap.getSelectedSeats ? seatmap.getSelectedSeats() : [];
+            (sel||[]).forEach(s => {
+              try { seatmap.seatUnselect(s); } catch(_){ }
+              try { s.unSelect && s.unSelect(); } catch(_){ }
+            });
+          }catch(_){ }
+          cart.clear();
+          renderCart();
+        });
+
+        checkoutBtn.addEventListener("click", () => {
+          if (cart.size === 0) return;
+          const items = Array.from(cart.values()).map(it => ({ id: it.id, zone: it.zone, qty: 1 }));
+          const payload = encodeURIComponent(JSON.stringify({ currency:"AED", vatMode, items }));
+          window.location.href = "/checkout.html?payload=" + payload;
+        });
+
+        // Mouse pos for badge
+        let lastMX = 30, lastMY = 30;
+        window.addEventListener("mousemove", (e)=>{ lastMX=e.clientX; lastMY=e.clientY; }, {passive:true});
+
+        // CLICK EVENT (senin kullandığın event yolu)
+        try{
+          seatmap.eventManager.addEventListener("SEAT.CLICK", (seat) => {
+            try{
+              if (seat?.item?.salable !== true) return;
+
+              const sid = String(seat?.item?.id || seat?.id || "");
+              if (!sid || sid.endsWith("-BODY")) return;
+
+              const willSelect = !seat.isSelected();
+              if (willSelect) seat.select();
+              else seat.unSelect();
+
+              const zone = zoneFromSeatId(sid);
+              if (!zone) return;
+
+              if (willSelect){
+                cart.set(sid, { id:sid, zone, title: seat?.item?.title || sid });
+              } else {
+                cart.delete(sid);
+              }
+              renderCart();
+
+              const badge = document.getElementById("priceBadge");
+              if (badge){
+                const finalPrice = priceOf(zone);
+                const label = (vatMode === "incl") ? "VAT incl." : "VAT excl.";
+                const title = seat?.item?.title || sid;
+
+                badge.innerHTML = `
+                  <div class="muted">${title}</div>
+                  <div class="price">${formatAED(finalPrice)} <span class="muted">(${label})</span></div>
+                `;
+                badge.style.left = `${lastMX}px`;
+                badge.style.top  = `${lastMY}px`;
+                badge.style.display = "block";
+                clearTimeout(window.__badgeT);
+                window.__badgeT = setTimeout(() => { badge.style.display="none"; }, 1200);
+              }
+
+              hideLegend();
+            }catch(e){
+              console.error("Seat click error:", e);
+            }
+          });
+        }catch(e){
+          console.error("Event bind error:", e);
+        }
+
+      });
+    })();
+  </script>
 </body>
 </html>

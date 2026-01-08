@@ -32,14 +32,12 @@ export class SeatMapCanvas {
     public windowManager: WindowManager;
     public zoomManager: ZoomManager;
     public eventManager: EventManager;
-    public addEventListener: any;
     public parsers: { [name: string]: ParserBase } = {};
 
     constructor(public container_selector: any, _config: DefaultsModel) {
         let _self = this;
         this.config = new DefaultsModel(_config);
         this.eventManager = new EventManager(this);
-        this.addEventListener = this.eventManager.addEventListener;
         this.node = d3Select(container_selector);
         this.windowManager = new WindowManager(this);
         this.zoomManager = new ZoomManager(this);
@@ -124,5 +122,13 @@ export class SeatMapCanvas {
 
     registerConverters() {
         this.parsers['pretix'] = new PretixParser();
+    }
+
+    public addEventListener(eventType: string | any, cb: any): this {
+        this.eventManager.addEventListener(eventType, cb);
+        if (this.svg) {
+            this.svg.updateEvents(true);
+        }
+        return this;
     }
 }
